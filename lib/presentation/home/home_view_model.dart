@@ -1,22 +1,42 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:image_search_0130/data/data_source/result.dart';
 import 'package:image_search_0130/domain/model/photo.dart';
-import 'package:image_search_0130/domain/repository/photo_api_repository.dart';
+import 'package:image_search_0130/domain/use_case/get_photos_use_case.dart';
+
+import 'home_state.dart';
+import 'home_ui_event.dart';
 
 class HomeViewModel with ChangeNotifier {
-  final PhotoApiRepository repository;
+  final GetPhotosUseCase getPhotosUseCase;
 
-  List<Photo> _photos = [];
+  HomeState _state = HomeState([], false);
 
-  UnmodifiableListView<Photo> get photos => UnmodifiableListView(_photos);
+  HomeState get state => _state;
 
-  HomeViewModel(this.repository);
+  final _eventController = StreamController<HomeUiEvent>();
+
+  Stream<HomeUiEvent> get eventStream => _eventController.stream;
+
+  HomeViewModel(this.getPhotosUseCase);
 
   Future<void> fetch(String query) async {
-    final result = await repository.fetch(query);
-    _photos = result;
+    _state = state.copyWith(isLoading: true);
+    notifyListeners();
+
+    final Result<List<Photo>> result = await getPhotosUseCase.call(query);
+
+    result.when(
+      success: (photos) {
+        _state = state.copyWith(photos: photos);
+        notifyListeners();
+      },
+      error: (message) {
+        _eventController.add(HomeUiEvent.showSnackBar(message));
+      },
+    );
+    _state = state.copyWith(isLoading: false);
     notifyListeners();
   }
 }
